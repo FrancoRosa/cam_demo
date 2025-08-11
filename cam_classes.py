@@ -353,7 +353,7 @@ def main():
     tracker = SimpleTracker()
     last_mode = -1
     frame_counter = 0
-    detection_interval = 2
+    detection_interval = 10
     last_detected_boxes, last_detected_classes, last_detected_scores = [], [], []
     
     while True:
