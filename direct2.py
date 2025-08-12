@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import argparse
 from yolov10 import setup_model, post_process_yolov10, IMG_SIZE, CLASSES
-
+from colors import colors 
 # --- Global variables for UI and mode selection ---
 current_mode = 0
 modes = {
@@ -16,25 +16,37 @@ button_width = 70
 button_height = 30
 button_gap = 10
 start_y = 10
-monitor_width = 1920
-monitor_height = 720
+# monitor_width = 1920
+# monitor_height = 550
+monitor_width = 1280
+monitor_height = 550
 webcam_width = 1280
+
 webcam_height = 720
 
 # --- Class Definitions and Colors ---
-TARGET_CLASS_NAMES = [
-    "person", "bicycle", "car", "motorbike", "aeroplane", "bus",
-    "train", "truck", "boat", "traffic light"
-]
+TARGET_CLASS_NAMES = ["person", "bicycle", "car", "motorbike", "bus", "train", "truck"]
+
+# TARGET_CLASS_NAMES = [
+#     "person", "bicycle", "car","motorbike","aeroplane","bus","train","truck","boat","traffic light",
+#            "fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow","elephant",
+#            "bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard","sports ball","kite",
+#            "baseball bat","baseball glove","skateboard","surfboard","tennis racket","bottle","wine glass","cup","fork","knife",
+#            "spoon","bowl","banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","sofa",
+#            "pottedplant","bed","diningtable","toilet","tvmonitor","laptop","mouse","remote","keyboard","cell phone","microwave",
+#            "oven","toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier", "toothbrush"
+# ]
+
 TARGET_CLASSES_MAP = {name: i for i, name in enumerate(CLASSES)}
 TARGET_CLASS_IDS = [TARGET_CLASSES_MAP[name] for name in TARGET_CLASS_NAMES]
 CLASS_TOGGLES = {cls: True for cls in TARGET_CLASS_NAMES}
 np.random.seed(0)
+
 CLASS_COLORS = {cls: (int(c[0]), int(c[1]), int(c[2])) for cls, c in zip(TARGET_CLASS_NAMES, np.random.randint(0, 255, size=(len(TARGET_CLASS_NAMES), 3)))}
 
 # --- Mouse Callback (Unchanged) ---
 def mouse_callback(event, x, y, flags, param):
-    global current_mode, CLASS_TOGGLES
+    global current_mode, CLASS_TOGGLES, tracker
     if event == cv2.EVENT_LBUTTONDOWN:
         # Mode buttons
         for mode_id in range(4):
@@ -56,7 +68,14 @@ def mouse_callback(event, x, y, flags, param):
                 CLASS_TOGGLES[cls] = not CLASS_TOGGLES[cls]
                 print(f"Toggled class '{cls}': {'Enabled' if CLASS_TOGGLES[cls] else 'Disabled'}")
                 return
-
+    # Clear Tracks Button
+        clear_button_x = 10 + button_width + button_gap
+        clear_button_y = monitor_height - button_height - 10
+        if clear_button_x < x < clear_button_x + button_width and clear_button_y < y < clear_button_y + button_height:
+            tracker.tracks = {}
+            tracker.next_id = 0
+            print("Tracking lines cleared.")
+            return
 # --- SIMPLIFIED: Simple Tracker ---
 # This tracker works directly with the coordinates of the current canvas.
 class SimpleTracker:
@@ -103,7 +122,7 @@ class SimpleTracker:
                 cv2.polylines(img, [np.array(positions)], isClosed=False, color=(0, 255, 0), thickness=2)
                 last_pos = positions[-1]
                 cv2.circle(img, last_pos, 5, (0, 0, 255), -1)
-                cv2.putText(img, f'ID:{tid}', last_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                cv2.putText(img, f'ID:{tid}', last_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors.white, 2)
 
 # --- UI Drawing Functions (Unchanged) ---
 def draw_buttons(frame):
@@ -112,7 +131,7 @@ def draw_buttons(frame):
         start_x = 10 + (button_width + button_gap) * mode_id
         color = (0, 255, 0) if mode_id == current_mode else (100, 100, 100)
         cv2.rectangle(frame, (start_x, start_y), (start_x + button_width, start_y + button_height), color, -1)
-        cv2.rectangle(frame, (start_x, start_y), (start_x + button_width, start_y + button_height), (255, 255, 255), 2)
+        cv2.rectangle(frame, (start_x, start_y), (start_x + button_width, start_y + button_height), colors.white, 2)
         text_size = cv2.getTextSize(mode_name, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
         text_x = start_x + (button_width - text_size[0]) // 2
         text_y = start_y + (button_height + text_size[1]) // 2
@@ -121,11 +140,20 @@ def draw_buttons(frame):
     start_x_exit, start_y_exit = 10, frame.shape[0] - button_height - 10
     color_exit = (0, 0, 255) if current_mode == 4 else (50, 50, 200)
     cv2.rectangle(frame, (start_x_exit, start_y_exit), (start_x_exit + button_width, start_y_exit + button_height), color_exit, -1)
-    cv2.rectangle(frame, (start_x_exit, start_y_exit), (start_x_exit + button_width, start_y_exit + button_height), (255, 255, 255), 2)
+    cv2.rectangle(frame, (start_x_exit, start_y_exit), (start_x_exit + button_width, start_y_exit + button_height), colors.white, 2)
     text_size_exit = cv2.getTextSize(modes[4], cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
     text_x_exit = start_x_exit + (button_width - text_size_exit[0]) // 2
     text_y_exit = start_y_exit + (button_height + text_size_exit[1]) // 2
     cv2.putText(frame, modes[4], (text_x_exit, text_y_exit), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+    # Clear Tracks Button
+    start_x_clear, start_y_clear = 10 + button_width + button_gap, frame.shape[0] - button_height - 10
+    color_clear = (92, 81, 53)  # Blue color
+    cv2.rectangle(frame, (start_x_clear, start_y_clear), (start_x_clear + button_width, start_y_clear + button_height), color_clear, -1)
+    cv2.rectangle(frame, (start_x_clear, start_y_clear), (start_x_clear + button_width, start_y_clear + button_height), colors.white, 2)
+    text_size_clear = cv2.getTextSize("Clear", cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+    text_x_clear = start_x_clear + (button_width - text_size_clear[0]) // 2
+    text_y_clear = start_y_clear + (button_height + text_size_clear[1]) // 2
+    cv2.putText(frame, "Clear", (text_x_clear, text_y_clear), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
 def draw_class_toggles(frame):
     y_start = 60
@@ -133,7 +161,7 @@ def draw_class_toggles(frame):
         y_pos = y_start + i * 25
         checkbox_color = (0, 255, 0) if CLASS_TOGGLES[cls] else (0, 0, 255)
         cv2.rectangle(frame, (10, y_pos), (30, y_pos + 20), checkbox_color, -1)
-        cv2.rectangle(frame, (10, y_pos), (30, y_pos + 20), (255, 255, 255), 2)
+        cv2.rectangle(frame, (10, y_pos), (30, y_pos + 20), colors.white, 2)
         cv2.putText(frame, cls, (40, y_pos + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, CLASS_COLORS[cls], 1, cv2.LINE_AA)
 
 # --- Core Logic Functions ---
@@ -201,7 +229,7 @@ def run_detection(frame, model, platform):
     return filtered_boxes, filtered_classes, filtered_scores
 
 def main():
-    global current_mode
+    global current_mode, tracker
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, default='./yolov10.rknn')
     parser.add_argument('--target', type=str, default='rk3576')
@@ -218,7 +246,7 @@ def main():
         print("Cannot open webcam")
         return
 
-    window_name = 'YOLOv10 Tracking - Direct Processing'
+    window_name = '360safe'
     cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
     cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.setMouseCallback(window_name, mouse_callback)
@@ -228,7 +256,7 @@ def main():
     
     # --- Add frame counter and detection interval ---
     frame_counter = 0
-    detection_interval = 5  # Run detection every 3 frames
+    detection_interval = 10  # Run detection every 3 frames
     last_boxes, last_classes, last_scores = [], [], []
 
     while True:
@@ -266,7 +294,6 @@ def main():
             current_boxes, current_classes, current_scores = [], [], []
             if display_canvas is not None:
                 current_boxes, current_classes, current_scores = run_detection(display_canvas, model, platform)
-                print(len(current_boxes))    
             last_boxes = current_boxes
             last_classes = current_classes
             last_scores = current_scores
