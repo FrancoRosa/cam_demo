@@ -85,7 +85,7 @@ def mouse_callback(event, x, y, flags, param):
 
 
 class SimpleTracker:
-    def __init__(self, max_age=30):
+    def __init__(self, max_age=150):
         self.tracks = {}
         self.next_id = 0
         self.max_age = max_age
@@ -298,11 +298,12 @@ def main():
 
     # --- Add frame counter and detection interval ---
     frame_counter = 0
-    detection_interval = 10  # Run detection every 3 frames
+    detection_interval = 3  # Run detection every 3 frames
     last_boxes, last_classes, last_scores = [], [], []
 
     while True:
         ret, original_frame = cap.read()
+        original_frame=cv2.flip(original_frame,1)
         if not ret:
             break
 
