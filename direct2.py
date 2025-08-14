@@ -21,8 +21,7 @@ webcam_width = 1280
 webcam_height = 720
 
 # --- Class Definitions and Colors ---
-TARGET_CLASS_NAMES = ["person", "bicycle",
-                      "car", "motorbike", "bus", "train", "truck"]
+TARGET_CLASS_NAMES = ["person", "car", "motorbike", "bus",  "truck"]
 
 # TARGET_CLASS_NAMES = [
 #     "person", "bicycle", "car","motorbike","aeroplane","bus","train","truck","boat","traffic light",
@@ -278,7 +277,14 @@ def main():
     parser.add_argument('--height', type=int,  default=550)
     args = parser.parse_args()
     background_image = np.zeros((args.height, args.width, 3), dtype=np.uint8)
-    model, platform = setup_model(args)
+    
+    window_name = '360safe'
+    cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty(
+        window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    cv2.setMouseCallback(window_name, mouse_callback)
+    cv2.imshow(window_name, background_image)
+    
     cap = cv2.VideoCapture(args.camera_id)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_height)
@@ -287,12 +293,9 @@ def main():
         print("Cannot open webcam")
         return
 
-    window_name = '360safe'
-    cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
-    cv2.setWindowProperty(
-        window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    cv2.setMouseCallback(window_name, mouse_callback)
-
+    
+    model, platform = setup_model(args)
+    
     tracker = SimpleTracker()
     last_mode = -1
 
