@@ -306,7 +306,7 @@ def main():
 
     while True:
         ret, original_frame = cap.read()
-        original_frame=cv2.flip(original_frame,1)
+        # original_frame=cv2.flip(original_frame,1)
         if not ret:
             break
 
@@ -320,7 +320,10 @@ def main():
 
         h, w = original_frame.shape[:2]
         h_half = h // 2
-
+        top_half = original_frame[0:h_half, :]
+        bottom_half = original_frame[h_half:h, :]
+        bottom_half_flipped = cv2.flip(bottom_half, 1)  # 1 for horizontal flip
+        original_frame[h_half:h, :] = bottom_half_flipped
         # --- Prepare Display Canvas (every frame) ---
         display_canvas = None
         if current_mode == 0:
